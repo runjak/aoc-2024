@@ -17,6 +17,7 @@ fn read_input(path: String) -> Result<Input, Box<dyn Error>> {
         .collect())
 }
 
+#[derive(PartialEq, Debug)]
 enum Direction {
     Unknown,
     Increments,
@@ -74,40 +75,41 @@ fn first() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-enum Delta {
-    Safe,
-    Unsafe,
+fn get_subreports(report: Vec<N>) -> Input {
+    let mut subreports: Input = Vec::new();
+
+    for index in 0..report.len() {
+        let subreport = report
+            .iter()
+            .cloned()
+            .take(index)
+            .chain(report.iter().skip(index + 1).cloned())
+            .collect();
+
+        subreports.push(subreport);
+    }
+
+    return subreports;
 }
 
-fn check_report(report: Vec<N>) -> Vec<(Direction, Delta)> {
-    let firsts = report.iter();
-    let seconds = report[1..].iter();
+fn solution_2(path: String) -> Result<usize, Box<dyn Error>> {
+    let input = read_input(path)?;
 
-    firsts
-        .zip(seconds)
-        .map(|(a, b)| -> (Direction, Delta) {
-            let direction = if a > b {
-                Direction::Decrements
-            } else if a < b {
-                Direction::Increments
-            } else {
-                Direction::Unknown
-            };
+    Ok(input
+        .into_iter()
+        .filter(|report| -> bool {
+            let subreports = get_subreports(report.to_owned());
 
-            let d = (a - b).abs();
-            let delta = if d < 1 || d > 3 {
-                Delta::Unsafe
-            } else {
-                Delta::Safe
-            };
-
-            return (direction, delta);
+            subreports
+                .iter()
+                .any(|report| report_is_safe(report.to_owned()))
         })
-        .collect()
+        .count())
 }
 
 fn second() -> Result<(), Box<dyn Error>> {
-    println!("to be done");
+    let wanted = solution_2("./inputs/02/input.txt".to_owned())?;
+    println!("{}", wanted);
     Ok(())
 }
 
@@ -120,12 +122,20 @@ pub fn main() -> Result<(), Box<dyn Error>> {
 
 #[cfg(test)]
 mod tests {
-    use super::solution_1;
+    use super::{solution_1, solution_2};
 
     #[test]
     fn solves_example_1_as_expected() {
         let actual = solution_1("./inputs/02/example.txt".to_owned()).unwrap();
         let expected = 2;
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn solves_example_2_as_expected() {
+        let actual = solution_2("./inputs/02/example.txt".to_owned()).unwrap();
+        let expected = 4;
 
         assert_eq!(actual, expected);
     }
