@@ -74,6 +74,38 @@ fn first() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+enum Delta {
+    Safe,
+    Unsafe,
+}
+
+fn check_report(report: Vec<N>) -> Vec<(Direction, Delta)> {
+    let firsts = report.iter();
+    let seconds = report[1..].iter();
+
+    firsts
+        .zip(seconds)
+        .map(|(a, b)| -> (Direction, Delta) {
+            let direction = if a > b {
+                Direction::Decrements
+            } else if a < b {
+                Direction::Increments
+            } else {
+                Direction::Unknown
+            };
+
+            let d = (a - b).abs();
+            let delta = if d < 1 || d > 3 {
+                Delta::Unsafe
+            } else {
+                Delta::Safe
+            };
+
+            return (direction, delta);
+        })
+        .collect()
+}
+
 fn second() -> Result<(), Box<dyn Error>> {
     println!("to be done");
     Ok(())
