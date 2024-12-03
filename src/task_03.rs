@@ -77,26 +77,28 @@ fn match_instructions(input: String) -> Vec<Instruction> {
 }
 
 fn filter_instructions(instructions: Vec<Instruction>) -> Vec<Mul> {
-    let mut result = Vec::new();
     let mut do_enabled = true;
 
-    for instruction in instructions.iter() {
-        match instruction {
-            Instruction::Do => {
-                do_enabled = true;
-            }
-            Instruction::Dont => {
-                do_enabled = false;
-            }
-            Instruction::Mul { a, b } => {
-                if do_enabled {
-                    result.push(Mul { a: *a, b: *b });
+    instructions
+        .iter()
+        .filter_map(|instruction| -> Option<Mul> {
+            match instruction {
+                Instruction::Do => {
+                    do_enabled = true;
+                }
+                Instruction::Dont => {
+                    do_enabled = false;
+                }
+                Instruction::Mul { a, b } => {
+                    if do_enabled {
+                        return Some(Mul { a: *a, b: *b });
+                    }
                 }
             }
-        }
-    }
 
-    return result;
+            None
+        })
+        .collect()
 }
 
 fn solution_2(path: String) -> Result<N, Box<dyn Error>> {
