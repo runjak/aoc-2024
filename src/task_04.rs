@@ -94,8 +94,51 @@ fn first() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn find_a_coordinates(input: Input) -> Vec<Coordinate> {
+    input
+        .iter()
+        .filter_map(|(coordinate, char)| -> Option<Coordinate> {
+            if *char == 'A' {
+                return Some(*coordinate);
+            }
+
+            None
+        })
+        .collect()
+}
+
+fn check_x_mas(input: &Input, a_coordinate: Coordinate) -> bool {
+    let w1 = [
+        *input.get(&add(a_coordinate, (-1, -1))).unwrap_or(&'.'),
+        'A',
+        *input.get(&add(a_coordinate, (1, 1))).unwrap_or(&'.'),
+    ]
+    .into_iter()
+    .collect::<String>();
+
+    let w2 = [
+        *input.get(&add(a_coordinate, (-1, 1))).unwrap_or(&'.'),
+        'A',
+        *input.get(&add(a_coordinate, (1, -1))).unwrap_or(&'.'),
+    ]
+    .into_iter()
+    .collect::<String>();
+
+    (w1 == "MAS" || w1 == "SAM") && (w2 == "MAS" || w2 == "SAM")
+}
+
+fn find_x_mas(input: Input) -> Vec<Coordinate> {
+    let a_coordinates = find_a_coordinates(input.clone());
+
+    a_coordinates
+        .into_iter()
+        .filter(|a_coordinate| check_x_mas(&input, *a_coordinate))
+        .collect()
+}
+
 fn second() -> Result<(), Box<dyn Error>> {
-    let wanted = 0;
+    let input = read_input(INPUT_PATH)?;
+    let wanted = find_x_mas(input).len();
     println!("{}", wanted);
     Ok(())
 }
@@ -109,7 +152,7 @@ pub fn main() -> Result<(), Box<dyn Error>> {
 
 #[cfg(test)]
 mod tests {
-    use super::{find_xmas, read_input, EXAMPLE_PATH};
+    use super::{find_x_mas, find_xmas, read_input, EXAMPLE_PATH};
 
     #[test]
     fn should_calculate_first_example() {
@@ -117,6 +160,16 @@ mod tests {
 
         let actual = find_xmas(input).len();
         let expected = 18;
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn should_calculate_second_example() {
+        let input = read_input(EXAMPLE_PATH).unwrap();
+
+        let actual = find_x_mas(input).len();
+        let expected = 9;
 
         assert_eq!(actual, expected);
     }
