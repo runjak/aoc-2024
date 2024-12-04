@@ -1,6 +1,5 @@
 use std::{collections::HashMap, error::Error, fs};
 
-const EXAMPLE_PATH: &str = "./inputs/04/example.txt";
 const INPUT_PATH: &str = "./inputs/04/input.txt";
 
 type N = i32;
@@ -152,7 +151,9 @@ pub fn main() -> Result<(), Box<dyn Error>> {
 
 #[cfg(test)]
 mod tests {
-    use super::{find_x_mas, find_xmas, read_input, EXAMPLE_PATH};
+    use super::{find_x_mas, find_xmas, read_input};
+
+    const EXAMPLE_PATH: &str = "./inputs/04/example.txt";
 
     #[test]
     fn should_calculate_first_example() {
