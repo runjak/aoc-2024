@@ -73,23 +73,25 @@ fn before_map(page_orderings: Vec<PageOrdering>) -> BeforeMap {
     return after_to_befores;
 }
 
+fn update_in_order(after_to_befores: &BeforeMap, update: &Update) -> bool {
+    for (index, page) in update.iter().enumerate() {
+        let Some(befores) = after_to_befores.get(page) else {
+            continue;
+        };
+
+        let afters = &update[index + 1..];
+        if afters.iter().any(|after| befores.contains(after)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 fn filter_ordered_updates(after_to_befores: BeforeMap, updates: Vec<Update>) -> Vec<Update> {
     updates
         .into_iter()
-        .filter(|update| -> bool {
-            for (index, page) in update.iter().enumerate() {
-                let Some(befores) = after_to_befores.get(page) else {
-                    continue;
-                };
-
-                let afters = &update[index + 1..];
-                if afters.iter().any(|after| befores.contains(after)) {
-                    return false;
-                }
-            }
-
-            return true;
-        })
+        .filter(|update| -> bool { update_in_order(&after_to_befores, update) })
         .collect()
 }
 
@@ -114,8 +116,44 @@ fn first() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn find_swap(after_to_befores: &BeforeMap, update: &Update) -> Option<(usize, usize)> {
+    for (index, page) in update.iter().enumerate() {
+        let Some(befores) = after_to_befores.get(page) else {
+            continue;
+        };
+
+        for (other_index, other_page) in update[index + 1..].iter().enumerate() {
+            if befores.contains(other_page) {
+                return Some((index, other_index + index + 1));
+            }
+        }
+    }
+
+    None
+}
+
+fn order_update(after_to_befores: &BeforeMap, mut update: Update) -> Update {
+    while let Some((a, b)) = find_swap(after_to_befores, &update) {
+        update.swap(a, b);
+    }
+
+    return update;
+}
+
+fn solution_2(input: Input) -> Page {
+    let after_to_befores = before_map(input.0);
+
+    input
+        .1
+        .into_iter()
+        .filter(|update| !update_in_order(&after_to_befores, update))
+        .map(|update| get_middle(order_update(&after_to_befores, update)))
+        .sum()
+}
+
 fn second() -> Result<(), Box<dyn Error>> {
-    let wanted = 0;
+    let input = read_input(INPUT_PATH).unwrap();
+    let wanted = solution_2(input);
     println!("{}", wanted);
     Ok(())
 }
@@ -129,7 +167,7 @@ pub fn main() -> Result<(), Box<dyn Error>> {
 
 #[cfg(test)]
 mod tests {
-    use super::{before_map, filter_ordered_updates, read_input, solution_1, Update};
+    use super::{before_map, filter_ordered_updates, read_input, solution_1, solution_2, Update};
 
     const EXAMPLE_PATH: &str = "./inputs/05/example.txt";
 
@@ -158,6 +196,10 @@ mod tests {
 
     #[test]
     fn should_calculate_second_example() {
-        assert_eq!(1, 0);
+        let input = read_input(EXAMPLE_PATH).unwrap();
+        let actual = solution_2(input);
+        let expected = 123;
+
+        assert_eq!(actual, expected);
     }
 }
