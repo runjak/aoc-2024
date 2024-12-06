@@ -82,9 +82,13 @@ fn rotate_right(direction: &Direction) -> Direction {
     }
 }
 
-fn walk_guard(mut input: Input) -> Input {
+type TurnLog = Vec<Coordinate>;
+
+fn walk_guard(mut input: Input) -> (Input, TurnLog) {
+    let mut turn_log = Vec::new();
+
     let Some(mut position) = find_guard(&input) else {
-        return input;
+        return (input, turn_log);
     };
 
     while let Some(Field::Player { direction }) = input.get(&position) {
@@ -94,6 +98,7 @@ fn walk_guard(mut input: Input) -> Input {
         if let Some(Field::Wall) = input.get(&next_position) {
             next_direction = rotate_right(direction);
             next_position = add_coordinates(&position, &direction_to_delta(&next_direction));
+            turn_log.push(position);
         }
 
         input.insert(position, Field::Visited);
@@ -108,11 +113,11 @@ fn walk_guard(mut input: Input) -> Input {
         position = next_position;
     }
 
-    return input;
+    return (input, turn_log);
 }
 
 fn solution_1(input: Input) -> N {
-    let walked_input = walk_guard(input);
+    let (walked_input, _) = walk_guard(input);
 
     walked_input
         .into_iter()
@@ -130,8 +135,73 @@ fn first() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+type Triplet = (Coordinate, Coordinate, Coordinate);
+
+fn into_triplets(turn_log: TurnLog) -> Vec<Triplet> {
+    turn_log
+        .iter()
+        .zip(turn_log[1..].iter())
+        .zip(turn_log[2..].iter())
+        .map(|((a, b), c)| (*a, *b, *c))
+        .collect()
+}
+
+fn keep_same((ax, ay): &Coordinate, (bx, by): &Coordinate) -> Coordinate {
+    let x = if ax == bx { *ax } else { 0 };
+    let y = if ay == by { *ay } else { 0 };
+
+    (x, y)
+}
+
+fn scale_coordinate(s: N, (x, y): &Coordinate) -> Coordinate {
+    (s * x, s * y)
+}
+
+fn suspect_coordinate((a, b, c): &Triplet) -> Coordinate {
+    let first = add_coordinates(a, &scale_coordinate(-1, &keep_same(a, b)));
+    let second = add_coordinates(c, &scale_coordinate(-1, &keep_same(b, c)));
+
+    add_coordinates(&first, &second)
+}
+
+fn coordinate_range(from: &Coordinate, to: &Coordinate) -> Vec<Coordinate> {
+    let mut range = Vec::new();
+
+    for x in from.0..(to.0 + 1) {
+        for y in from.1..(to.1 + 1) {
+            range.push((x, y));
+        }
+    }
+
+    range
+}
+
+fn can_loop(input: &Input, triplet: &Triplet) -> bool {
+    let suspect = suspect_coordinate(triplet);
+    let wall_candidates = coordinate_range(&triplet.2, &suspect);
+
+    wall_candidates
+        .into_iter()
+        .map(|coordinate| input.get(&coordinate).unwrap_or(&Field::Wall))
+        .all(|field| match field {
+            Field::Wall => false,
+            _ => true,
+        })
+}
+
+fn solution_2(input: Input) -> N {
+    let (walked_input, turn_log) = walk_guard(input);
+    let triplets = into_triplets(turn_log);
+
+    triplets
+        .into_iter()
+        .filter(|triplet| can_loop(&walked_input, triplet))
+        .count() as N
+}
+
 fn second() -> Result<(), Box<dyn Error>> {
-    let wanted = 0;
+    let input = read_input(INPUT_PATH)?;
+    let wanted = solution_2(input);
     println!("{}", wanted);
     Ok(())
 }
@@ -145,7 +215,7 @@ pub fn main() -> Result<(), Box<dyn Error>> {
 
 #[cfg(test)]
 mod tests {
-    use super::{read_input, solution_1};
+    use super::{read_input, solution_1, solution_2, suspect_coordinate};
 
     const EXAMPLE_PATH: &str = "./inputs/06/example.txt";
 
@@ -154,6 +224,23 @@ mod tests {
         let input = read_input(EXAMPLE_PATH).unwrap();
         let actual = solution_1(input);
         let expected = 41;
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn should_suspect_the_right_coordinate() {
+        let actual = suspect_coordinate(&((4, 1), (8, 1), (8, 6)));
+        let expected = (4, 6);
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn should_compute_example_2() {
+        let input = read_input(EXAMPLE_PATH).unwrap();
+        let actual = solution_2(input);
+        let expected = 6;
 
         assert_eq!(actual, expected);
     }
