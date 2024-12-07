@@ -164,11 +164,24 @@ fn suspect_coordinate((a, b, c): &Triplet) -> Coordinate {
     add_coordinates(&first, &second)
 }
 
+// cmp::minmax currently in unstable
+// https://doc.rust-lang.org/std/cmp/fn.minmax.html
+fn minmax(a: N, b: N) -> (N, N) {
+    if b > a {
+        (a, b)
+    } else {
+        (b, a)
+    }
+}
+
 fn coordinate_range(from: &Coordinate, to: &Coordinate) -> Vec<Coordinate> {
+    let (min_x, max_x) = minmax(from.0, to.0);
+    let (min_y, max_y) = minmax(from.1, to.1);
+
     let mut range = Vec::new();
 
-    for x in from.0..(to.0 + 1) {
-        for y in from.1..(to.1 + 1) {
+    for x in min_x..(max_x + 1) {
+        for y in min_y..(max_y + 1) {
             range.push((x, y));
         }
     }
@@ -215,7 +228,9 @@ pub fn main() -> Result<(), Box<dyn Error>> {
 
 #[cfg(test)]
 mod tests {
-    use super::{read_input, solution_1, solution_2, suspect_coordinate};
+    use super::{
+        can_loop, into_triplets, read_input, solution_1, solution_2, suspect_coordinate, walk_guard,
+    };
 
     const EXAMPLE_PATH: &str = "./inputs/06/example.txt";
 
@@ -232,6 +247,23 @@ mod tests {
     fn should_suspect_the_right_coordinate() {
         let actual = suspect_coordinate(&((4, 1), (8, 1), (8, 6)));
         let expected = (4, 6);
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn should_find_loops() {
+        let input = read_input(EXAMPLE_PATH).unwrap();
+        let (walked_input, turn_log) = walk_guard(input);
+        let triplets = into_triplets(turn_log);
+
+        let actual = triplets
+            .into_iter()
+            .filter(|triplet| can_loop(&walked_input, triplet))
+            .map(|triplet| suspect_coordinate(&triplet))
+            .collect::<Vec<_>>();
+
+        let expected = Vec::from([(4, 6), (6, 6), (2, 8), (6, 7), /*(4, 8),*/ (7, 8)]);
 
         assert_eq!(actual, expected);
     }
