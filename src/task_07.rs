@@ -2,7 +2,7 @@ use std::{cmp::max, error::Error, fs};
 
 const INPUT_PATH: &str = "./inputs/07/input.txt";
 
-type N = i32;
+type N = i64;
 
 #[derive(Debug, PartialEq)]
 struct Equation {
@@ -33,6 +33,7 @@ fn read_input(path: &str) -> Result<Input, Box<dyn Error>> {
         .collect())
 }
 
+#[derive(PartialEq, Debug)]
 enum Operator {
     Add,
     Multiply,
@@ -51,6 +52,8 @@ fn next_operator(operators: N) -> (Operator, N) {
 
 fn calculate_equation(equation: &Equation, mut operators: N) -> N {
     let mut inputs = equation.inputs.to_owned();
+    inputs.reverse();
+
     let mut value = inputs.pop().unwrap();
 
     while let Some(input) = inputs.pop() {
@@ -68,7 +71,7 @@ fn calculate_equation(equation: &Equation, mut operators: N) -> N {
 
 fn operator_choices(equation: &Equation) -> N {
     let power: u32 = (equation.inputs.len() - 1).try_into().unwrap();
-    max(2_i32.pow(power), 0)
+    max(2_i64.pow(power), 0)
 }
 
 fn equation_solvable(equation: &Equation) -> bool {
@@ -113,18 +116,26 @@ pub fn main() -> Result<(), Box<dyn Error>> {
 
 #[cfg(test)]
 mod tests {
-    use crate::task_07::equation_solvable;
-
-    use super::{read_input, solution_1};
+    use super::{calculate_equation, next_operator, read_input, solution_1, Equation, Operator};
 
     const EXAMPLE_PATH: &str = "./inputs/07/example.txt";
 
     #[test]
-    fn should_solve_second_example_equation() {
-        let input = read_input(EXAMPLE_PATH).unwrap();
-        let equation = input.get(1).unwrap();
+    fn next_operator_behaves() {
+        assert_eq!(next_operator(0), (Operator::Add, 0));
+        assert_eq!(next_operator(1), (Operator::Multiply, 0));
+        assert_eq!(next_operator(2), (Operator::Add, 1));
+        assert_eq!(next_operator(3), (Operator::Multiply, 1));
+    }
 
-        assert!(equation_solvable(equation));
+    #[test]
+    fn calculates_equation_as_expected() {
+        let equation = Equation {
+            value: 3267,
+            inputs: Vec::from([81, 40, 27]),
+        };
+        let actual = calculate_equation(&equation, 2);
+        assert_eq!(actual, equation.value)
     }
 
     #[test]
