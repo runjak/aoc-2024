@@ -113,9 +113,19 @@ pub fn main() -> Result<(), Box<dyn Error>> {
 
 #[cfg(test)]
 mod tests {
+    use crate::task_07::equation_solvable;
+
     use super::{read_input, solution_1};
 
     const EXAMPLE_PATH: &str = "./inputs/07/example.txt";
+
+    #[test]
+    fn should_solve_second_example_equation() {
+        let input = read_input(EXAMPLE_PATH).unwrap();
+        let equation = input.get(1).unwrap();
+
+        assert!(equation_solvable(equation));
+    }
 
     #[test]
     fn should_compute_example_1() {
