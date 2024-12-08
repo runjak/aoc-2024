@@ -157,7 +157,7 @@ fn antinodes_in_bounding_box(
 
             let ((sx, sy), (dx, dy)) = (start, direction);
 
-            let mut factor = 1;
+            let mut factor = 0;
             loop {
                 let location = (sx + factor * dx, sy + factor * dy);
 
@@ -206,7 +206,8 @@ fn solution_2(input: Input) -> N {
 }
 
 fn second() -> Result<(), Box<dyn Error>> {
-    let wanted = 0;
+    let input = read_input(INPUT_PATH)?;
+    let wanted = solution_2(input);
     println!("{}", wanted);
     Ok(())
 }
