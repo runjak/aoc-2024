@@ -103,7 +103,7 @@ fn antinode_pair(a: &Antenna, b: &Antenna) -> Vec<Coordinate> {
     Vec::from([(ax - dx, ay - dy), (bx + dx, by + dy)])
 }
 
-fn get_antinodes(antennas: &Vec<Antenna>) -> HashSet<Coordinate> {
+fn get_antinodes_by_pairs(antennas: &Vec<Antenna>) -> HashSet<Coordinate> {
     let mut antinodes = HashSet::new();
 
     for (index, first_antenna) in antennas.iter().enumerate() {
@@ -123,7 +123,7 @@ fn solution_1(input: Input) -> N {
 
     let antinodes = grouped_antennas
         .values()
-        .flat_map(|antennas| get_antinodes(antennas))
+        .flat_map(|antennas| get_antinodes_by_pairs(antennas))
         .filter(|location| in_bounding_box(location, &bounding_box))
         .collect::<HashSet<_>>();
 
@@ -135,6 +135,74 @@ fn first() -> Result<(), Box<dyn Error>> {
     let wanted = solution_1(input);
     println!("{}", wanted);
     Ok(())
+}
+
+fn antinodes_in_bounding_box(
+    a: &Antenna,
+    b: &Antenna,
+    bounding_box: &Coordinate,
+) -> HashSet<Coordinate> {
+    let (ax, ay) = a.location;
+    let (bx, by) = b.location;
+
+    let start_and_direction = [
+        (a.location, (ax - bx, ay - by)),
+        (b.location, (bx - ax, by - ay)),
+    ];
+
+    start_and_direction
+        .into_iter()
+        .flat_map(|(start, direction)| -> Vec<Coordinate> {
+            let mut antinodes = Vec::new();
+
+            let ((sx, sy), (dx, dy)) = (start, direction);
+
+            let mut factor = 1;
+            loop {
+                let location = (sx + factor * dx, sy + factor * dy);
+
+                if !in_bounding_box(&location, bounding_box) {
+                    break;
+                }
+
+                antinodes.push(location);
+                factor += 1;
+            }
+
+            antinodes
+        })
+        .collect()
+}
+
+fn get_antinodes_by_bounding_box(
+    antennas: &Vec<Antenna>,
+    bounding_box: &Coordinate,
+) -> HashSet<Coordinate> {
+    let mut antinodes = HashSet::new();
+
+    for (index, first_antenna) in antennas.iter().enumerate() {
+        for second_antenna in antennas[index + 1..].iter() {
+            for antinode in
+                antinodes_in_bounding_box(first_antenna, second_antenna, bounding_box).into_iter()
+            {
+                antinodes.insert(antinode);
+            }
+        }
+    }
+
+    antinodes
+}
+
+fn solution_2(input: Input) -> N {
+    let bounding_box = get_bounding_box(&input);
+    let grouped_antennas = group_by_frequency(get_antennas(input));
+
+    let antinodes = grouped_antennas
+        .values()
+        .flat_map(|antennas| get_antinodes_by_bounding_box(antennas, &bounding_box))
+        .collect::<HashSet<_>>();
+
+    antinodes.len() as N
 }
 
 fn second() -> Result<(), Box<dyn Error>> {
@@ -152,7 +220,7 @@ pub fn main() -> Result<(), Box<dyn Error>> {
 
 #[cfg(test)]
 mod tests {
-    use super::{read_input, solution_1};
+    use super::{read_input, solution_1, solution_2};
 
     const EXAMPLE_PATH: &str = "./inputs/08/example.txt";
 
@@ -161,6 +229,15 @@ mod tests {
         let input = read_input(EXAMPLE_PATH).unwrap();
         let actual = solution_1(input);
         let expected = 14;
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn should_compute_second_example() {
+        let input = read_input(EXAMPLE_PATH).unwrap();
+        let actual = solution_2(input);
+        let expected = 34;
 
         assert_eq!(actual, expected);
     }
