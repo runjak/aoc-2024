@@ -93,7 +93,7 @@ fn compact(mut input: Input) -> Vec<File> {
     compacted
 }
 
-fn checksum(files: &Vec<File>) -> N {
+fn checksum_files(files: &Vec<File>) -> N {
     let mut offset: N = 0;
 
     files
@@ -118,14 +118,84 @@ fn checksum(files: &Vec<File>) -> N {
 
 fn first() -> Result<(), Box<dyn Error>> {
     let input = read_input(INPUT_PATH)?;
-    let wanted = checksum(&compact(input));
+    let wanted = checksum_files(&compact(input));
     println!("{}", wanted);
     Ok(())
 }
 
+fn compact_whole(mut input: Input) -> Input {
+    let mut start_seek_free = 0;
+
+    for file_index in (0..input.len()).rev() {
+        if file_index < start_seek_free {
+            break;
+        }
+
+        let Some(Segment::File(file)) = input.get(file_index) else {
+            continue;
+        };
+        let file = *file;
+
+        let mut found_first_free = false;
+        for free_index in start_seek_free..file_index {
+            let Some(Segment::Space(space)) = input.get(free_index) else {
+                continue;
+            };
+
+            if !found_first_free {
+                found_first_free = true;
+                start_seek_free = free_index;
+            }
+
+            let left_over_space = *space - file.length;
+            if left_over_space < 0 {
+                continue;
+            }
+
+            input[file_index] = Segment::Space(file.length);
+            input[free_index] = Segment::File(file);
+            if left_over_space > 0 {
+                input.insert(free_index + 1, Segment::Space(left_over_space));
+            }
+            break;
+        }
+    }
+
+    input
+}
+
+fn checksum_segments(input: Input) -> N {
+    let mut offset: N = 0;
+
+    input
+        .iter()
+        .map(|segment| -> N {
+            let mut sum: N = 0;
+            match segment {
+                Segment::Space(space) => {
+                    offset += space;
+                }
+                Segment::File(file) => {
+                    /*
+                     * Optimisable. Consider:
+                     * nx + (n+1)x + .. + (n+(l-1))x
+                     * = l(x+n) + (l*(l-1))/2
+                     */
+                    for _ in 0..file.length {
+                        sum += offset * file.id;
+                        offset += 1;
+                    }
+                }
+            }
+
+            sum
+        })
+        .sum()
+}
+
 fn second() -> Result<(), Box<dyn Error>> {
     let input = read_input(INPUT_PATH)?;
-    let wanted = 0;
+    let wanted = checksum_segments(compact_whole(input));
     println!("{}", wanted);
     Ok(())
 }
@@ -139,7 +209,9 @@ pub fn main() -> Result<(), Box<dyn Error>> {
 
 #[cfg(test)]
 mod tests {
-    use super::{checksum, compact, read_input};
+    use crate::task_09::checksum_segments;
+
+    use super::{checksum_files, compact, compact_whole, read_input};
 
     const EXAMPLE_PATH: &str = "./inputs/09/example.txt";
 
@@ -167,9 +239,43 @@ mod tests {
     fn should_solve_example_1() {
         let input = read_input(EXAMPLE_PATH).unwrap();
         let compacted = compact(input);
-        let actual = checksum(&compacted);
+        let actual = checksum_files(&compacted);
 
         let expected = 1928;
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn should_compact_example_2() {
+        let input = read_input(EXAMPLE_PATH).unwrap();
+        let compacted = compact_whole(input);
+
+        let actual = compacted
+            .into_iter()
+            .flat_map(|segment| -> Vec<char> {
+                match segment {
+                    super::Segment::Space(space) => ".".repeat(space as usize).chars().collect(),
+                    super::Segment::File(file) => file
+                        .id
+                        .to_string()
+                        .repeat(file.length as usize)
+                        .chars()
+                        .collect(),
+                }
+            })
+            .collect::<String>();
+
+        let expected = "00992111777.44.333....5555.6666.....8888..".to_owned();
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn should_solve_example_2() {
+        let input = read_input(EXAMPLE_PATH).unwrap();
+        let compacted = compact_whole(input);
+        let actual = checksum_segments(compacted);
+
+        let expected = 2858;
         assert_eq!(actual, expected);
     }
 }
