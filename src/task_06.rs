@@ -30,7 +30,7 @@ enum Field {
     Floor,
     Wall,
     Player { direction: Direction },
-    Visited,
+    Visited { walked_off: Direction },
 }
 
 type Input = HashMap<Coordinate, Field>;
@@ -82,13 +82,11 @@ fn rotate_right(direction: &Direction) -> Direction {
     }
 }
 
-type TurnLog = Vec<Coordinate>;
-
-fn walk_guard(mut input: Input) -> (Input, TurnLog) {
+fn walk_guard(mut input: Input) -> Input {
     let mut turn_log = Vec::new();
 
     let Some(mut position) = find_guard(&input) else {
-        return (input, turn_log);
+        return input;
     };
 
     while let Some(Field::Player { direction }) = input.get(&position) {
@@ -101,7 +99,12 @@ fn walk_guard(mut input: Input) -> (Input, TurnLog) {
             turn_log.push(position);
         }
 
-        input.insert(position, Field::Visited);
+        input.insert(
+            position,
+            Field::Visited {
+                walked_off: next_direction,
+            },
+        );
         if input.contains_key(&next_position) {
             input.insert(
                 next_position,
@@ -113,16 +116,16 @@ fn walk_guard(mut input: Input) -> (Input, TurnLog) {
         position = next_position;
     }
 
-    return (input, turn_log);
+    return input;
 }
 
 fn solution_1(input: Input) -> N {
-    let (walked_input, _) = walk_guard(input);
+    let walked_input = walk_guard(input);
 
     walked_input
         .into_iter()
         .filter(|(_, field)| match field {
-            Field::Visited => true,
+            Field::Visited { walked_off: _ } => true,
             _ => false,
         })
         .count() as N
@@ -135,86 +138,55 @@ fn first() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-type Triplet = (Coordinate, Coordinate, Coordinate);
-
-fn into_triplets(turn_log: TurnLog) -> Vec<Triplet> {
-    turn_log
-        .iter()
-        .zip(turn_log[1..].iter())
-        .zip(turn_log[2..].iter())
-        .map(|((a, b), c)| (*a, *b, *c))
-        .collect()
-}
-
-fn keep_same((ax, ay): &Coordinate, (bx, by): &Coordinate) -> Coordinate {
-    let x = if ax == bx { *ax } else { 0 };
-    let y = if ay == by { *ay } else { 0 };
-
-    (x, y)
-}
-
-fn scale_coordinate(s: N, (x, y): &Coordinate) -> Coordinate {
-    (s * x, s * y)
-}
-
-fn suspect_coordinate((a, b, c): &Triplet) -> Coordinate {
-    let first = add_coordinates(a, &scale_coordinate(-1, &keep_same(a, b)));
-    let second = add_coordinates(c, &scale_coordinate(-1, &keep_same(b, c)));
-
-    add_coordinates(&first, &second)
-}
-
-// cmp::minmax currently in unstable
-// https://doc.rust-lang.org/std/cmp/fn.minmax.html
-fn minmax(a: N, b: N) -> (N, N) {
-    if b > a {
-        (a, b)
-    } else {
-        (b, a)
+fn flip_direction(direction: &Direction) -> Direction {
+    match direction {
+        Direction::Up => Direction::Down,
+        Direction::Down => Direction::Up,
+        Direction::Left => Direction::Right,
+        Direction::Right => Direction::Left,
     }
 }
 
-fn coordinate_range(from: &Coordinate, to: &Coordinate) -> Vec<Coordinate> {
-    let (min_x, max_x) = minmax(from.0, to.0);
-    let (min_y, max_y) = minmax(from.1, to.1);
+fn foo(input: Input) -> Vec<Coordinate> {
+    let mut visited = input
+        .into_iter()
+        .filter_map(|(position, field)| -> Option<(Coordinate, Direction)> {
+            match field {
+                Field::Floor => None,
+                Field::Wall => None,
+                Field::Player { direction: _ } => None,
+                Field::Visited { walked_off } => Some((position, walked_off)),
+            }
+        })
+        .collect::<HashMap<Coordinate, Direction>>();
 
-    let mut range = Vec::new();
+    let mut dragons = Vec::new();
 
-    for x in min_x..(max_x + 1) {
-        for y in min_y..(max_y + 1) {
-            range.push((x, y));
+    while !visited.is_empty() {
+        let Some(position) = visited.keys().next() else {
+            break;
+        };
+        let position = *position;
+
+        let Some(direction) = visited.remove(&position) else {
+            break;
+        };
+        let delta = direction_to_delta(&direction);
+
+        // Remove visited in same direction:
+        let mut next_position = add_coordinates(&position, &delta);
+        while visited.contains_key(&next_position) {
+            visited.remove(&next_position);
+            next_position = add_coordinates(&next_position, &delta);
         }
     }
 
-    range
-}
-
-fn can_loop(input: &Input, triplet: &Triplet) -> bool {
-    let suspect = suspect_coordinate(triplet);
-    let wall_candidates = coordinate_range(&triplet.2, &suspect);
-
-    wall_candidates
-        .into_iter()
-        .map(|coordinate| input.get(&coordinate).unwrap_or(&Field::Wall))
-        .all(|field| match field {
-            Field::Wall => false,
-            _ => true,
-        })
-}
-
-fn solution_2(input: Input) -> N {
-    let (walked_input, turn_log) = walk_guard(input);
-    let triplets = into_triplets(turn_log);
-
-    triplets
-        .into_iter()
-        .filter(|triplet| can_loop(&walked_input, triplet))
-        .count() as N
+    dragons
 }
 
 fn second() -> Result<(), Box<dyn Error>> {
     let input = read_input(INPUT_PATH)?;
-    let wanted = solution_2(input);
+    let wanted = 0;
     println!("{}", wanted);
     Ok(())
 }
@@ -228,9 +200,7 @@ pub fn main() -> Result<(), Box<dyn Error>> {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        can_loop, into_triplets, read_input, solution_1, solution_2, suspect_coordinate, walk_guard,
-    };
+    use super::{read_input, solution_1, walk_guard};
 
     const EXAMPLE_PATH: &str = "./inputs/06/example.txt";
 
@@ -243,37 +213,37 @@ mod tests {
         assert_eq!(actual, expected);
     }
 
-    #[test]
-    fn should_suspect_the_right_coordinate() {
-        let actual = suspect_coordinate(&((4, 1), (8, 1), (8, 6)));
-        let expected = (4, 6);
+    // #[test]
+    // fn should_suspect_the_right_coordinate() {
+    //     let actual = suspect_coordinate(&((4, 1), (8, 1), (8, 6)));
+    //     let expected = (4, 6);
 
-        assert_eq!(actual, expected);
-    }
+    //     assert_eq!(actual, expected);
+    // }
 
-    #[test]
-    fn should_find_loops() {
-        let input = read_input(EXAMPLE_PATH).unwrap();
-        let (walked_input, turn_log) = walk_guard(input);
-        let triplets = into_triplets(turn_log);
+    // #[test]
+    // fn should_find_loops() {
+    //     let input = read_input(EXAMPLE_PATH).unwrap();
+    //     let (walked_input, turn_log) = walk_guard(input);
+    //     let triplets = into_triplets(turn_log);
 
-        let actual = triplets
-            .into_iter()
-            .filter(|triplet| can_loop(&walked_input, triplet))
-            .map(|triplet| suspect_coordinate(&triplet))
-            .collect::<Vec<_>>();
+    //     let actual = triplets
+    //         .into_iter()
+    //         .filter(|triplet| can_loop(&walked_input, triplet))
+    //         .map(|triplet| suspect_coordinate(&triplet))
+    //         .collect::<Vec<_>>();
 
-        let expected = Vec::from([(4, 6), (6, 6), (2, 8), (6, 7), /*(4, 8),*/ (7, 8)]);
+    //     let expected = Vec::from([(4, 6), (6, 6), (2, 8), (6, 7), /*(4, 8),*/ (7, 8)]);
 
-        assert_eq!(actual, expected);
-    }
+    //     assert_eq!(actual, expected);
+    // }
 
-    #[test]
-    fn should_compute_example_2() {
-        let input = read_input(EXAMPLE_PATH).unwrap();
-        let actual = solution_2(input);
-        let expected = 6;
+    // #[test]
+    // fn should_compute_example_2() {
+    //     let input = read_input(EXAMPLE_PATH).unwrap();
+    //     let actual = solution_2(input);
+    //     let expected = 6;
 
-        assert_eq!(actual, expected);
-    }
+    //     assert_eq!(actual, expected);
+    // }
 }
