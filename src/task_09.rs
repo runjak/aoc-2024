@@ -23,9 +23,26 @@ enum Segment {
 type Input = Vec<Segment>;
 
 fn read_input(path: &str) -> Result<Input, Box<dyn Error>> {
-    let mut input = fs::read_to_string(path)?;
+    let input = fs::read_to_string(path)?;
 
-    Ok(Vec::new())
+    let mut is_space = false;
+
+    Ok(input
+        .chars()
+        .enumerate()
+        .filter_map(|(index, char)| -> Option<Segment> {
+            let length = char.to_digit(10)? as N;
+
+            let segment = match is_space {
+                true => Segment::Space(length),
+                false => Segment::File(File { id: (index as N)/2, length }),
+            }
+
+            is_space = !is_space;
+
+            Some(segment)
+        })
+        .collect())
 }
 
 fn first() -> Result<(), Box<dyn Error>> {
